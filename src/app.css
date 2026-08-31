@@ -1,0 +1,116 @@
+:root {
+  --bg: #08090c;
+  --bg-panel: #101218;
+  --bg-raised: #171a22;
+  /* The system shelf, which slides over the left stack. A step above
+     `--bg-panel` and fully opaque — it overlaps the panels rather than
+     replacing them, so it has to sit clearly in front of them. */
+  --bg-shelf: #191c25;
+  --border: #232733;
+  --text: #d8dbe2;
+  --text-dim: #8b90a0;
+  --accent: #6ea8ff;
+  --danger: #e06c6c;
+  /* Completion/success. Deliberately not a mission's own colour: "done" has to
+     read the same on every card to be scannable down a list. */
+  --ok: #5fcf8e;
+
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+/* Form controls: the body editor and create dialog share these so a number
+   field looks the same wherever it appears. */
+input[type='text'],
+input[type='number'],
+select {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 6px;
+  min-width: 0;
+}
+
+input[type='text']:focus,
+input[type='number']:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+input[type='color'] {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+input[type='range'] {
+  accent-color: var(--accent);
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+/* The mission guide's pointer: whichever control the current step targets
+   applies this (see state/missionGuide.svelte.ts). Global because the targets
+   are scattered across components; a box-shadow ring rather than a border swap
+   so it layers on any control shape without moving layout. */
+.guide-glow {
+  animation: guide-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes guide-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--accent) 90%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-glow {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+}

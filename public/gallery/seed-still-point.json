@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "name": "The Still Point",
+  "bodies": [
+    {
+      "id": "8dccbcad-39b2-4e3f-aa7a-53ff9c55c395",
+      "name": "Castor",
+      "color": "#ffd27a",
+      "type": "star",
+      "mass": 1.98892e+30,
+      "radius": 695700000,
+      "rotationPeriod": 2160000,
+      "axialTilt": 0,
+      "position": {
+        "x": 0,
+        "y": 30000000000,
+        "z": 0
+      },
+      "velocity": {
+        "x": -33260.09645165209,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "id": "6ea180c6-7f2c-4e9d-a32e-21cffb77ce43",
+      "name": "Pollux",
+      "color": "#a8c8ff",
+      "type": "star",
+      "mass": 1.98892e+30,
+      "radius": 695700000,
+      "rotationPeriod": 2160000,
+      "axialTilt": 0,
+      "position": {
+        "x": 0,
+        "y": -30000000000,
+        "z": 0
+      },
+      "velocity": {
+        "x": 33260.09645165209,
+        "y": 0,
+        "z": 0
+      }
+    },
+    {
+      "id": "a2878203-de65-4942-966d-18d45cd96e51",
+      "name": "Fulcrum",
+      "color": "#d98e5a",
+      "type": "rocky",
+      "mass": 5.972e+24,
+      "radius": 6371000,
+      "rotationPeriod": 86400,
+      "axialTilt": 0,
+      "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "velocity": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      }
+    }
+  ],
+  "settings": {
+    "dt": 600,
+    "snapshotInterval": 86400,
+    "trailInterval": 21600
+  }
+}

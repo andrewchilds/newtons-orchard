@@ -1,0 +1,32 @@
+{
+  "name": "newtons-orchard",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "test": "vitest run",
+    "bake-textures": "node scripts/bake-textures.mjs",
+    "gallery-add": "node --experimental-transform-types --disable-warning=ExperimentalWarning scripts/gallery-add.mjs",
+    "preset-screenshots": "${PRESET_SHOT_PYTHON:-/Users/andrew/Projects/local-python-env/bin/python} scripts/preset-screenshots.py"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "@tsconfig/svelte": "^5.0.8",
+    "@types/node": "^24.13.3",
+    "@types/three": "^0.185.4",
+    "jpeg-js": "^0.4.4",
+    "svelte": "^5.56.8",
+    "svelte-check": "^4.7.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "lucide-svelte": "^1.0.1",
+    "three": "^0.185.1"
+  }
+}

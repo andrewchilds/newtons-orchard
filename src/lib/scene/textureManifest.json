@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "types": {
+    "star": {
+      "variants": 4,
+      "size": 2048,
+      "hue": 0.1072
+    },
+    "earthlike": {
+      "variants": 6,
+      "size": 2048,
+      "hue": 0.5805
+    },
+    "rocky": {
+      "variants": 6,
+      "size": 2048,
+      "hue": 0.0595
+    },
+    "gas": {
+      "variants": 6,
+      "size": 1536,
+      "hue": 0.0833
+    },
+    "ice": {
+      "variants": 4,
+      "size": 1024,
+      "hue": 0.5595
+    },
+    "dwarf": {
+      "variants": 6,
+      "size": 1536,
+      "hue": 0.087
+    },
+    "moon": {
+      "variants": 6,
+      "size": 2048,
+      "hue": 0.1111
+    },
+    "asteroid": {
+      "variants": 8,
+      "size": 512,
+      "hue": 0.0938
+    },
+    "satellite": {
+      "variants": 4,
+      "size": 1024,
+      "hue": 0.6111
+    }
+  },
+  "panelVariants": 4
+}
