@@ -373,7 +373,11 @@ export class SceneManager {
 	private lastPredictionKey = "";
 
 	constructor(canvasContainer: HTMLElement, labelContainer: HTMLElement) {
-		this.renderer = new THREE.WebGLRenderer({ antialias: true });
+		// Log depth buffer: near/far spans nine orders of magnitude, and a linear
+		// 24-bit depth buffer's resolution at outer-planet distances is tens of
+		// scene units — bigger than an exaggerated planet, so ring/atmosphere
+		// fragments behind a body pass the depth test and draw over it from afar.
+		this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
 		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 		this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
 		canvasContainer.appendChild(this.renderer.domElement);
