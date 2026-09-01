@@ -71,6 +71,9 @@ function samplesForDays(days: number, interval: number): number {
 /** At most this many PointLights; beyond it, extra stars are emissive only. */
 const MAX_STAR_LIGHTS = 3;
 
+/** How hard a star's surface glows (and how much the bloom pass catches). */
+const STAR_EMISSIVE_INTENSITY = 1.6;
+
 /**
  * A body's fallback dot is fully lit while its drawn disc is below the first
  * radius (CSS px) and gone above the second — by then the disc itself is a few
@@ -1239,7 +1242,7 @@ export class SceneManager {
 				// than unlit spheres, and so the bloom pass has something to catch.
 				emissive: new THREE.Color(isStar ? body.color : 0x000000),
 				emissiveMap: isStar ? texture : null,
-				emissiveIntensity: isStar ? 1.4 : 0
+				emissiveIntensity: isStar ? STAR_EMISSIVE_INTENSITY : 0
 			});
 			// Maps are baked in a per-type reference color; the body's own color is a
 			// shader hue rotation. A photographic map is already the body's true
@@ -1443,7 +1446,7 @@ export class SceneManager {
 			const isStar = body.type === "star";
 			visual.material.emissive.set(isStar ? body.color : 0x000000);
 			visual.material.emissiveMap = isStar ? texture : null;
-			visual.material.emissiveIntensity = isStar ? 1.4 : 0;
+			visual.material.emissiveIntensity = isStar ? STAR_EMISSIVE_INTENSITY : 0;
 			// A photographic map takes no hue rotation; if this material had one
 			// (the body was edited off a procedural surface), zero it in place.
 			if (body.texture) neutralizeHueRotation(visual.material);
