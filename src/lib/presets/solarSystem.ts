@@ -170,6 +170,10 @@ const PLANETS: PlanetSpec[] = [
     axialTilt: 97.77,
     elements: { a: 19.18916464 * AU, e: 0.04725744, i: 0.77263783, lan: 74.01692503, argPeriapsis: 96.99885295, trueAnomaly: 313.23810451 },
     atmosphere: { color: '#b8ecf7', density: 0.45 },
+    // Real ring span: ring 6 (~1.64 R) out to the ε ring (~2.0 R). Charcoal-dark
+    // and near-transparent in life; drawn dim grey at low opacity so they read
+    // as "faint rings", clearly second to Saturn's.
+    rings: { innerRadius: 4.184e7, outerRadius: 5.115e7, color: '#8a8f96', opacity: 0.28 },
   },
   {
     name: 'Neptune',
