@@ -203,6 +203,48 @@ describe('TrailBuffer reference frames', () => {
   });
 });
 
+// Regression: a satellite thousands of scene units from the origin drew a
+// jumpy trail when zoomed close — absolute float32 vertices quantize to
+// hundreds of km at that magnitude. The renderer rebases each trail around its
+// newest point and carries the offset in the line transform instead.
+describe('TrailBuffer rebase origin', () => {
+  it('subtracts the origin in float64, before the float32 narrowing', () => {
+    const buffer = new TrailBuffer({ interval: 1, capacity: 10 });
+    // ~3000 scene units out, moving 1e-5 units per sample — well below
+    // float32 resolution at that magnitude (~2.4e-4).
+    buffer.record(0, ['a'], positions([3000, 0, 0]), SCALE);
+    buffer.record(1, ['a'], positions([3000.00001, 0, 0]), SCALE);
+
+    // Without a rebase the motion collapses entirely.
+    const absolute = buffer.pointsFor('a', null);
+    expect(absolute[3] - absolute[0]).toBe(0);
+
+    const origin = { x: 0, y: 0, z: 0 };
+    expect(buffer.newestPointInto('a', null, origin)).toBe(true);
+    expect(origin.x).toBe(3000.00001);
+
+    const out = new Float32Array(6);
+    buffer.copyPointsInto('a', null, 2, out, origin.x, origin.y, origin.z);
+    // The newest point lands exactly on the origin; the older one keeps the
+    // sub-float32 offset.
+    expect(out[3]).toBe(0);
+    expect(out[0]).toBeCloseTo(-1e-5, 9);
+  });
+
+  it('newestPointInto is reference-relative and reports unknown tracks', () => {
+    const buffer = new TrailBuffer({ interval: 1, capacity: 10 });
+    buffer.record(0, ['a', 'r'], positions([5, 0, 0], [1, 0, 0]), SCALE);
+    buffer.record(1, ['a', 'r'], positions([7, 1, 0], [2, 0, 0]), SCALE);
+
+    const out = { x: NaN, y: NaN, z: NaN };
+    expect(buffer.newestPointInto('a', 'r', out)).toBe(true);
+    expect([out.x, out.y, out.z]).toEqual([5, 1, 0]);
+
+    expect(buffer.newestPointInto('nope', null, out)).toBe(false);
+    expect(buffer.newestPointInto('a', 'nope', out)).toBe(false);
+  });
+});
+
 describe('TrailBuffer capacity', () => {
   it('drops the oldest samples while keeping every track aligned', () => {
     const buffer = new TrailBuffer({ interval: 1, capacity: 3 });

@@ -33,6 +33,16 @@ interface TrailEntry {
   material: THREE.LineBasicMaterial;
   /** points the current attribute can hold */
   reserved: number;
+  /**
+   * The trail's newest point (reference-relative, float64), subtracted from
+   * every vertex before the float32 attribute write and re-added via
+   * `line.position`. Distant trails need this: at thousands of scene units a
+   * float32 vertex quantizes to hundreds of km, and a far satellite's trail
+   * visibly snapped between grid points when zoomed close. The line transform
+   * goes through double-precision CPU matrix math, so the offset costs no
+   * precision there.
+   */
+  origin: THREE.Vector3;
 }
 
 export class Trails {
@@ -182,7 +192,11 @@ export class Trails {
       if (anchors) {
         for (const [id, anchor] of anchors) {
           const entry = this.entries.get(id);
-          if (entry) entry.line.position.set(anchor.position.x, anchor.position.y, anchor.position.z);
+          if (entry) {
+            entry.line.position
+              .set(anchor.position.x, anchor.position.y, anchor.position.z)
+              .add(entry.origin);
+          }
         }
       }
       return;
@@ -210,16 +224,31 @@ export class Trails {
       // with it.
       const entry = this.entryFor(id, count);
 
-      if (anchor) entry.line.position.set(anchor.position.x, anchor.position.y, anchor.position.z);
-      else entry.line.position.set(0, 0, 0);
-
       if (count === 0) {
         entry.geometry.setDrawRange(0, 0);
         continue;
       }
 
+      entry.origin.set(0, 0, 0);
+      this.buffer.newestPointInto(id, relativeTo, entry.origin);
+      if (anchor) {
+        entry.line.position
+          .set(anchor.position.x, anchor.position.y, anchor.position.z)
+          .add(entry.origin);
+      } else {
+        entry.line.position.copy(entry.origin);
+      }
+
       const attr = entry.geometry.getAttribute('position') as THREE.BufferAttribute;
-      this.buffer.copyPointsInto(id, relativeTo, count, attr.array as Float32Array);
+      this.buffer.copyPointsInto(
+        id,
+        relativeTo,
+        count,
+        attr.array as Float32Array,
+        entry.origin.x,
+        entry.origin.y,
+        entry.origin.z
+      );
       attr.needsUpdate = true;
 
       // Fade toward the tail: alpha is per-vertex so the oldest end dissolves
@@ -295,7 +324,7 @@ export class Trails {
       const line = new THREE.Line(new THREE.BufferGeometry(), material);
       line.frustumCulled = false;
       this.group.add(line);
-      entry = { line, geometry: line.geometry, material, reserved: 0 };
+      entry = { line, geometry: line.geometry, material, reserved: 0, origin: new THREE.Vector3() };
       this.entries.set(id, entry);
     }
 

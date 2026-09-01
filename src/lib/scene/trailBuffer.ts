@@ -347,8 +347,23 @@ export class TrailBuffer {
    * triples, oldest→newest, reference-relative. `count` must come from a
    * `countFor` call with the same arguments and no buffer mutation in between
    * — it is what locates the run — and `out` must hold at least `count · 3`.
+   *
+   * The origin is subtracted here, in float64, *before* the narrowing write:
+   * a trail thousands of scene units out quantizes to hundreds of km once it
+   * lands in the Float32Array, so the renderer rebases each trail near zero
+   * and carries the origin in the line's (double-precision) transform.
+   * Subtracting after the write would be too late — the precision is already
+   * gone.
    */
-  copyPointsInto(id: string, referenceId: string | null, count: number, out: Float32Array): void {
+  copyPointsInto(
+    id: string,
+    referenceId: string | null,
+    count: number,
+    out: Float32Array,
+    originX = 0,
+    originY = 0,
+    originZ = 0
+  ): void {
     const track = this.tracks.get(id);
     const flags = this.alive.get(id);
     if (!track || !flags) return;
@@ -360,15 +375,39 @@ export class TrailBuffer {
       const s = (first + k) * 3;
       const o = k * 3;
       if (refTrack) {
-        out[o] = track[s] - refTrack[s];
-        out[o + 1] = track[s + 1] - refTrack[s + 1];
-        out[o + 2] = track[s + 2] - refTrack[s + 2];
+        out[o] = track[s] - refTrack[s] - originX;
+        out[o + 1] = track[s + 1] - refTrack[s + 1] - originY;
+        out[o + 2] = track[s + 2] - refTrack[s + 2] - originZ;
       } else {
-        out[o] = track[s];
-        out[o + 1] = track[s + 1];
-        out[o + 2] = track[s + 2];
+        out[o] = track[s] - originX;
+        out[o + 1] = track[s + 1] - originY;
+        out[o + 2] = track[s + 2] - originZ;
       }
     }
+  }
+
+  /**
+   * Write the newest sample for `id` (reference-relative, full float64) into
+   * `out` — the rebase origin for `copyPointsInto`. An out-param rather than a
+   * return value because this runs per body per frame during a reverse scrub,
+   * where per-call allocation was a measured GC cost. False when either track
+   * is unknown or empty; `out` is untouched then.
+   */
+  newestPointInto(
+    id: string,
+    referenceId: string | null,
+    out: { x: number; y: number; z: number }
+  ): boolean {
+    const track = this.tracks.get(id);
+    if (!track || track.length === 0) return false;
+    const refTrack = referenceId === null ? null : (this.tracks.get(referenceId) ?? null);
+    if (referenceId !== null && !refTrack) return false;
+
+    const s = track.length - 3;
+    out.x = track[s] - (refTrack ? refTrack[s] : 0);
+    out.y = track[s + 1] - (refTrack ? refTrack[s + 1] : 0);
+    out.z = track[s + 2] - (refTrack ? refTrack[s + 2] : 0);
+    return true;
   }
 
   /** Discard the `count` newest samples, keeping every track aligned. */
