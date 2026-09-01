@@ -9,7 +9,7 @@ listed per file.
 | --- | --- | --- |
 | `mercury.jpg` | NASA/JHUAPL/Carnegie, MESSENGER MDIS enhanced-color basemap ([PIA17386](https://images.nasa.gov/details/PIA17386)) | converted to grayscale luminance (the enhanced color is false-color mineralogy), faint warm tint |
 | `venus.jpg` | NASA/USGS, Magellan C3-MDIR colorized radar mosaic ([Astropedia](https://astrogeology.usgs.gov/search/map/venus_magellan_c3_mdir_colorized_global_mosaic_4641m)) | resize only — radar surface, not the visible cloud deck |
-| `earth.jpg` | NASA/GSFC, Blue Marble Next Generation w/ topography and bathymetry, Dec 2004 ([Visible Earth 73909](https://visibleearth.nasa.gov/images/73909)) | resize only |
+| `earth.jpg` | NASA/GSFC, Blue Marble Next Generation w/ topography and bathymetry, Dec 2004 ([Visible Earth 73909](https://visibleearth.nasa.gov/images/73909)) | midtone + saturation lift, extra brightness/blue push on ocean pixels — the source's dark bathymetry rendered near-black under the scene's lighting |
 | `moon.jpg` | NASA/GSFC/ASU, LROC WAC color mosaic ([SVS CGI Moon Kit](https://svs.gsfc.nasa.gov/4720/), `lroc_color_poles_4k.tif`) | resize only |
 | `mars.jpg` | NASA/USGS, Viking MDIM 2.1 colorized mosaic (via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Mars_Viking_MDIM21_ClrMosaic_1km.jpg), PD USGS product) | glitched rows at the extreme poles clamped |
 | `ceres.jpg` | NASA/JPL-Caltech/UCLA/MPS/DLR/IDA, Dawn FC2 HAMO clear-filter global mosaic, equidistant cylindrical ([PDS SBN, DWNCHCFC2_2](https://sbnarchive.psi.edu/pds3/dawn/fc/DWNCHCFC2_2/EXTRAS/CE_HAMO_G_00N_180E_EQU_CLR.TIF)) | grayscale source, faint warm tint; polar bands keep the mosaic's baked-in low-sun shadows |
