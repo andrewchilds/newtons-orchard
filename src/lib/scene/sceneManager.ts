@@ -304,7 +304,7 @@ export class SceneManager {
 
 	private renderer: THREE.WebGLRenderer;
 	private labelRenderer: CSS2DRenderer;
-	private starfield: THREE.Points;
+	private starfield: THREE.Group;
 	private trails: Trails;
 	private picker = new Picker();
 	private marker = new SelectionMarker();
@@ -957,8 +957,16 @@ export class SceneManager {
 		this.atmosphereGeometry.dispose();
 		this.blackHoleMaterial.dispose();
 		this.lensPass.dispose();
-		this.starfield.geometry.dispose();
-		(this.starfield.material as THREE.Material).dispose();
+		// The sky's textures are per-instance (canvas-painted), not the shared
+		// body maps `textures.ts` owns, so disposing them here is safe.
+		this.starfield.traverse((child) => {
+			if (child instanceof THREE.Mesh || child instanceof THREE.Points) {
+				child.geometry.dispose();
+				const material = child.material as THREE.Material & { map?: THREE.Texture | null };
+				material.map?.dispose();
+				material.dispose();
+			}
+		});
 		this.composer.dispose();
 		this.renderer.dispose();
 		this.renderer.domElement.remove();

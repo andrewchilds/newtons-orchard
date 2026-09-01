@@ -306,38 +306,42 @@ export function neutralizeHueRotation(material: THREE.MeshStandardMaterial): voi
 
 // --- starfield ----------------------------------------------------------------
 
+const SKY_RADIUS = 4e5;
+const SKY_STAR_COUNT = 2400;
+/** Extra stars concentrated toward the galactic plane. */
+const BAND_STAR_COUNT = 1400;
+const BRIGHT_STAR_COUNT = 90;
+/** Gaussian half-thickness of the galactic band, radians of latitude. */
+const BAND_SIGMA = 0.15;
+
 /**
- * Starfield background points on a far sphere. The caller adds the Points to
- * the scene and disposes it. The camera's `far` plane must exceed `radius`.
+ * Peak channel for any sky star. The ceiling keeps every star under the bloom
+ * pass's 0.62 threshold: a star that crosses it goes through UnrealBloom's
+ * downsample/upsample chain, which resamples a ~1px dot differently each frame
+ * and makes the whole sky shimmer. `bodyDots` assumes this ceiling when it
+ * picks a dot peak that outranks the sky.
  */
-export function createStarfield(count = 3000, radius = 4e5): THREE.Points {
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-  const rand = mulberry32(0x5eed);
+const SKY_STAR_MAX = 0.56;
 
-  for (let i = 0; i < count; i++) {
-    // Uniform on the sphere: z uniform in [-1,1], azimuth uniform.
-    const z = rand() * 2 - 1;
-    const theta = rand() * Math.PI * 2;
-    const r = Math.sqrt(1 - z * z);
-    const i3 = i * 3;
-    positions[i3] = Math.cos(theta) * r * radius;
-    positions[i3 + 1] = z * radius;
-    positions[i3 + 2] = Math.sin(theta) * r * radius;
+/** Standard normal from the seeded stream (Box–Muller). */
+function gaussian(rand: () => number): number {
+  return Math.sqrt(-2 * Math.log(Math.max(rand(), 1e-12))) * Math.cos(2 * Math.PI * rand());
+}
 
-    // Slight color variation: most white, some warm, some blue.
-    //
-    // The brightness ceiling keeps every star under the bloom pass's 0.62
-    // threshold. A star that crosses it goes through UnrealBloom's
-    // downsample/upsample chain, which resamples a ~1px dot differently each
-    // frame and makes the whole sky shimmer.
-    const tint = rand();
-    const brightness = 0.3 + rand() * 0.26;
-    colors[i3] = brightness * (tint > 0.8 ? 1 : 0.9);
-    colors[i3 + 1] = brightness * 0.92;
-    colors[i3 + 2] = brightness * (tint < 0.2 ? 1 : 0.88);
+/**
+ * Star tint for temperature `t` ∈ [0, 1], warm → white → blue-white. The peak
+ * channel stays at 1 so brightness remains an independent knob.
+ */
+function starTint(t: number): [number, number, number] {
+  if (t < 0.5) {
+    const k = t * 2;
+    return [1, 0.72 + 0.28 * k, 0.5 + 0.5 * k];
   }
+  const k = t * 2 - 1;
+  return [1 - 0.34 * k, 1 - 0.18 * k, 1];
+}
 
+function makeStarPoints(positions: Float32Array, colors: Float32Array, size: number): THREE.Points {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -347,7 +351,7 @@ export function createStarfield(count = 3000, radius = 4e5): THREE.Points {
   // footprint that lands on a different sample each frame and shimmers under
   // bloom. A couple of screen pixels is stable under resampling and motion.
   const material = new THREE.PointsMaterial({
-    size: 1.6,
+    size,
     sizeAttenuation: false,
     vertexColors: true,
     depthWrite: false,
@@ -356,8 +360,254 @@ export function createStarfield(count = 3000, radius = 4e5): THREE.Points {
   });
 
   const points = new THREE.Points(geometry, material);
-  // Never frustum-cull the sky, and always draw it behind everything.
   points.frustumCulled = false;
   points.renderOrder = -1;
   return points;
+}
+
+/**
+ * The sky's diffuse content — galactic band glow, dust lanes, a few deep-sky
+ * smudges — painted once onto an equirect canvas and worn on the inside of a
+ * sphere. Additive over the near-black clear color, so unpainted canvas costs
+ * nothing; a smooth low-frequency texture resamples stably, unlike sub-pixel
+ * points, so it can't shimmer under bloom. Painted values stay far below the
+ * 0.62 bloom threshold.
+ */
+function createSkyDome(rand: () => number): THREE.Mesh {
+  const W = 2048;
+  const H = 1024;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const finalCtx = canvas.getContext('2d')!;
+  const paint = document.createElement('canvas');
+  paint.width = W;
+  paint.height = H;
+  let ctx = paint.getContext('2d')!;
+  const mid = H / 2;
+
+  // Soft elliptical gradient blob; re-drawn shifted a canvas-width when it
+  // overhangs a seam, or the band shows a gap at the wrap longitude.
+  const blob = (
+    x: number,
+    y: number,
+    r: number,
+    aspect: number,
+    angle: number,
+    color: string
+  ): void => {
+    for (const dx of [0, -W, W]) {
+      if (dx !== 0 && Math.abs(x + dx - W / 2) > W / 2 + r) continue;
+      ctx.save();
+      ctx.translate(x + dx, y);
+      ctx.rotate(angle);
+      ctx.scale(1, aspect);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      g.addColorStop(0, color);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(-r, -r / aspect, r * 2, (r * 2) / aspect);
+      ctx.restore();
+    }
+  };
+  const mix = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
+  const starlight = (warm: number, alpha: number) =>
+    `rgba(${mix(198, 255, warm)},${mix(213, 236, warm)},${mix(255, 216, warm)},${alpha})`;
+
+  // The band: clumped soft blobs along the equator (the group's rotation
+  // tilts it to its place in the sky).
+  for (let i = 0; i < 260; i++) {
+    const x = rand() * W;
+    const y = mid + gaussian(rand) * 40;
+    blob(x, y, 50 + rand() * 110, 0.5 + rand() * 0.5, 0, starlight(rand(), 0.016 + rand() * 0.024));
+  }
+
+  // The bulge: a brighter, warmer clump around one longitude.
+  const bulgeX = W * 0.62;
+  blob(bulgeX, mid, 260, 0.45, 0, starlight(0.85, 0.04));
+  for (let i = 0; i < 50; i++) {
+    const x = bulgeX + gaussian(rand) * 140;
+    const y = mid + gaussian(rand) * 28;
+    blob(x, y, 40 + rand() * 80, 0.5 + rand() * 0.4, 0, starlight(0.6 + rand() * 0.4, 0.02 + rand() * 0.03));
+  }
+
+  // Dust lanes: erase streaks hugging the centerline. Erasing beats painting
+  // dark — the sphere is additive, so "dark" can only mean less glow.
+  ctx.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 70; i++) {
+    const x = rand() * W;
+    const y = mid + gaussian(rand) * 16;
+    blob(x, y, 30 + rand() * 70, 0.2 + rand() * 0.2, (rand() - 0.5) * 0.5, `rgba(0,0,0,${0.05 + rand() * 0.1})`);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+
+  // Nebulas: faintly colored patches in and near the band, layered pairs so
+  // they read as irregular rather than round.
+  const nebulaColors = ['rgba(120,190,185,', 'rgba(205,150,160,', 'rgba(150,160,215,'];
+  for (let i = 0; i < 4; i++) {
+    const x = rand() * W;
+    const y = mid + gaussian(rand) * 70;
+    const color = nebulaColors[i % nebulaColors.length];
+    const r = 26 + rand() * 34;
+    blob(x, y, r, 0.5 + rand() * 0.4, rand() * Math.PI, `${color}${0.04 + rand() * 0.03})`);
+    blob(x + (rand() - 0.5) * r, y + (rand() - 0.5) * r * 0.6, r * 0.6, 0.6, rand() * Math.PI, `${color}0.04)`);
+  }
+
+  // Canvas gradients are dithered (Skia's banding fix), and at this texel
+  // density the noise magnifies into a visible dot lattice on screen. Blurring
+  // the diffuse layer into the final canvas averages it out; the three shifted
+  // copies keep the wrap seam continuous under the blur window.
+  // Flatten onto opaque black first: on a transparent canvas the stored color
+  // is premultiplied, so at these low alphas the un-premultiplied RGB the GPU
+  // receives is quantized to a handful of coarse steps (multi-LSB banding no
+  // amount of dither survives — the noise rescales by alpha on upload).
+  // Opaque means RGB *is* the light value, quantized at full 8-bit precision.
+  finalCtx.fillStyle = '#000';
+  finalCtx.fillRect(0, 0, W, H);
+  finalCtx.filter = 'blur(5px)';
+  for (const dx of [0, -W, W]) finalCtx.drawImage(paint, dx, 0);
+  finalCtx.filter = 'none';
+  ctx = finalCtx;
+
+  // The blur also removes the dither, which re-exposes 8-bit banding as
+  // contour arcs across the glow. Re-dither with structureless noise — ±1.5
+  // LSB, one offset per pixel so the grain doesn't sparkle with false color.
+  const img = finalCtx.getImageData(0, 0, W, H);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i] === 0 && d[i + 1] === 0 && d[i + 2] === 0) continue;
+    const n = rand() * 4 - 2;
+    d[i] = Math.max(0, Math.min(255, d[i] + n));
+    d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + n));
+    d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + n));
+  }
+  finalCtx.putImageData(img, 0, 0);
+
+  // Distant galaxies: tiny tilted ellipses off the band, a dim halo around a
+  // small warm core. Drawn after the blur so their cores stay crisp. The
+  // first is the local "Andromeda", a bit larger.
+  for (let i = 0; i < 6; i++) {
+    const x = rand() * W;
+    const side = rand() < 0.5 ? -1 : 1;
+    const y = mid + side * (H * 0.12 + rand() * H * 0.26);
+    const size = i === 0 ? 20 : 7 + rand() * 9;
+    const angle = rand() * Math.PI;
+    blob(x, y, size, 0.3 + rand() * 0.3, angle, `rgba(215,220,255,${i === 0 ? 0.2 : 0.3})`);
+    blob(x, y, size * 0.3, 0.5, angle, 'rgba(255,244,228,0.4)');
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  // No mipmaps: near the dome's poles the u axis minifies hard, and mip
+  // selection lands on a level where the dither noise has averaged away and
+  // the requantized gradient breaks into contour rings around the pole
+  // (anisotropic filtering would fix it, but SwiftShader — the CI/screenshot
+  // renderer — doesn't support it). Level-0 sampling keeps the grain, which
+  // is what masks the banding; the texture is low-frequency, so skipping
+  // minification can't alias anything else.
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+  });
+  // Slightly inside the star shell; depthWrite is off, so it can't occlude.
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(SKY_RADIUS * 0.98, 64, 32), material);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = -2;
+  return mesh;
+}
+
+/**
+ * Starfield background on a far sphere: field stars, a galactic band of
+ * concentrated stars over a painted glow, and a sparse bright layer. The
+ * caller adds the group to the scene and disposes its contents. The camera's
+ * `far` plane must exceed `SKY_RADIUS`.
+ */
+export function createStarfield(): THREE.Group {
+  const rand = mulberry32(0x5eed);
+  const total = SKY_STAR_COUNT + BAND_STAR_COUNT;
+  const positions = new Float32Array(total * 3);
+  const colors = new Float32Array(total * 3);
+
+  const setStar = (
+    i: number,
+    x: number,
+    y: number,
+    z: number,
+    brightness: number,
+    temp: number
+  ): void => {
+    const i3 = i * 3;
+    positions[i3] = x * SKY_RADIUS;
+    positions[i3 + 1] = y * SKY_RADIUS;
+    positions[i3 + 2] = z * SKY_RADIUS;
+    const [r, g, b] = starTint(temp);
+    colors[i3] = r * brightness;
+    colors[i3 + 1] = g * brightness;
+    colors[i3 + 2] = b * brightness;
+  };
+
+  for (let i = 0; i < SKY_STAR_COUNT; i++) {
+    // Uniform on the sphere: y uniform in [-1,1], azimuth uniform.
+    const y = rand() * 2 - 1;
+    const theta = rand() * Math.PI * 2;
+    const r = Math.sqrt(1 - y * y);
+    // Power-law brightness (many dim, few bright); triangular temperature so
+    // most stars sit near white with warm and blue tails.
+    setStar(
+      i,
+      Math.cos(theta) * r,
+      y,
+      Math.sin(theta) * r,
+      0.22 + (SKY_STAR_MAX - 0.22) * Math.pow(rand(), 1.7),
+      (rand() + rand()) / 2
+    );
+  }
+
+  // Band stars: gaussian latitude about the equator (the group rotation tilts
+  // the plane), dimmer and warmer than the field — distant disc stars seen
+  // through dust.
+  for (let i = 0; i < BAND_STAR_COUNT; i++) {
+    const az = rand() * Math.PI * 2;
+    const lat = Math.max(-1.2, Math.min(1.2, gaussian(rand) * BAND_SIGMA));
+    const c = Math.cos(lat);
+    setStar(
+      SKY_STAR_COUNT + i,
+      Math.cos(az) * c,
+      Math.sin(lat),
+      Math.sin(az) * c,
+      0.15 + 0.28 * Math.pow(rand(), 1.6),
+      0.4 * (rand() + rand())
+    );
+  }
+
+  const brightPositions = new Float32Array(BRIGHT_STAR_COUNT * 3);
+  const brightColors = new Float32Array(BRIGHT_STAR_COUNT * 3);
+  for (let i = 0; i < BRIGHT_STAR_COUNT; i++) {
+    const y = rand() * 2 - 1;
+    const theta = rand() * Math.PI * 2;
+    const r = Math.sqrt(1 - y * y);
+    const i3 = i * 3;
+    brightPositions[i3] = Math.cos(theta) * r * SKY_RADIUS;
+    brightPositions[i3 + 1] = y * SKY_RADIUS;
+    brightPositions[i3 + 2] = Math.sin(theta) * r * SKY_RADIUS;
+    const [cr, cg, cb] = starTint((rand() + rand()) / 2);
+    const brightness = 0.4 + (SKY_STAR_MAX - 0.4) * rand();
+    brightColors[i3] = cr * brightness;
+    brightColors[i3 + 1] = cg * brightness;
+    brightColors[i3 + 2] = cb * brightness;
+  }
+
+  const group = new THREE.Group();
+  group.add(createSkyDome(rand));
+  group.add(makeStarPoints(positions, colors, 1.6));
+  group.add(makeStarPoints(brightPositions, brightColors, 2.6));
+  // Tilt the galactic plane off the ecliptic so the band crosses the default
+  // view diagonally instead of edge-on.
+  group.rotation.set(-0.2, 0, 0.5);
+  return group;
 }
