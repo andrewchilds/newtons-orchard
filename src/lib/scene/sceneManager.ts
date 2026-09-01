@@ -957,14 +957,10 @@ export class SceneManager {
 		this.atmosphereGeometry.dispose();
 		this.blackHoleMaterial.dispose();
 		this.lensPass.dispose();
-		// The sky's textures are per-instance (canvas-painted), not the shared
-		// body maps `textures.ts` owns, so disposing them here is safe.
 		this.starfield.traverse((child) => {
-			if (child instanceof THREE.Mesh || child instanceof THREE.Points) {
+			if (child instanceof THREE.Points) {
 				child.geometry.dispose();
-				const material = child.material as THREE.Material & { map?: THREE.Texture | null };
-				material.map?.dispose();
-				material.dispose();
+				(child.material as THREE.Material).dispose();
 			}
 		});
 		this.composer.dispose();
