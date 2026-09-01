@@ -87,14 +87,30 @@
     />
   </label>
 
-  <label
-    class="row sub"
-    class:disabled={!ui.showTrails}
-    title="Draw each trail around the body it orbits, so a moon shows its ellipse in any view. Off draws trails against the view center only."
-  >
-    <input type="checkbox" bind:checked={ui.parentRelativeTrails} disabled={!ui.showTrails} />
-    <span>Around orbit parent</span>
-  </label>
+  <fieldset class="radio-group sub" class:disabled={!ui.showTrails}>
+    <legend>Orbit around</legend>
+    <label
+      class="row"
+      title="Draw each trail around the body it orbits, so a moon shows its ellipse in any view."
+    >
+      <input
+        type="radio"
+        value={true}
+        bind:group={ui.parentRelativeTrails}
+        disabled={!ui.showTrails}
+      />
+      <span>Parent body</span>
+    </label>
+    <label class="row" title="Draw all trails against the view center.">
+      <input
+        type="radio"
+        value={false}
+        bind:group={ui.parentRelativeTrails}
+        disabled={!ui.showTrails}
+      />
+      <span>View center</span>
+    </label>
+  </fieldset>
 
   <label class="row">
     <input type="checkbox" bind:checked={ui.showLabels} />
@@ -166,9 +182,34 @@
     margin: -3px 0 0 21px;
   }
 
-  .slider-row.disabled {
+  .slider-row.disabled,
+  .radio-group.disabled {
     opacity: 0.45;
     cursor: default;
+  }
+
+  .radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .radio-group.sub {
+    margin: -3px 0 0 21px;
+  }
+
+  .radio-group legend {
+    padding: 0;
+    margin-bottom: 5px;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+
+  .radio-group .row {
+    font-size: 12px;
   }
 
   .slider-row span {
@@ -182,7 +223,8 @@
     accent-color: var(--accent);
   }
 
-  input[type='checkbox'] {
+  input[type='checkbox'],
+  input[type='radio'] {
     accent-color: var(--accent);
   }
 
