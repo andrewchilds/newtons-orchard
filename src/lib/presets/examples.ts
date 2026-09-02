@@ -104,8 +104,8 @@ export interface PresetShot {
 	 */
 	parentRelativeTrails?: boolean;
 	/**
-	 * The app defaults lensing off (the warp obscures orbit geometry), but a
-	 * black hole card should show the type's signature look.
+	 * Follows the app default (on) when omitted. Set false where the warp
+	 * obscures the orbit geometry the card is meant to show.
 	 */
 	lensing?: boolean;
 	/**
@@ -1074,7 +1074,7 @@ export const PRESETS: Preset[] = [
 		// Two days is ~8 laps of S2's rosette and one circuit of the outer
 		// reference ring, so precession and the quiet circle both read. S-Doomed is
 		// long gone — the plunge is for live viewing.
-		shot: { days: 2, exaggeration: 40, zoom: 2e12, lensing: true }
+		shot: { days: 2, exaggeration: 40, zoom: 2e12 }
 	}
 ];
 

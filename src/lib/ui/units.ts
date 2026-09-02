@@ -107,6 +107,20 @@ export function formatDegrees(degrees: number): string {
   return `${rounded === 360 ? 0 : rounded}°`;
 }
 
+/**
+ * Camera distance from the view center for the readout. AU once past a tenth
+ * of one (a planetary view), km below (a moon or ring system). Three figures:
+ * the value churns under every wheel notch, so precision beyond a glance is
+ * noise, and a fixed count keeps the row from jittering in width.
+ */
+export function formatCameraDistance(meters: number): string {
+  if (!Number.isFinite(meters) || meters < 0) return '—';
+  const au = toAu(meters);
+  if (au >= 0.1) return `${Number(au.toPrecision(3)).toLocaleString(undefined, { maximumFractionDigits: 3 })} AU`;
+  const km = toKm(meters);
+  return `${Number(km.toPrecision(3)).toLocaleString(undefined, { maximumFractionDigits: 3 })} km`;
+}
+
 // --- validation ----------------------------------------------------------
 
 export interface ValidationResult {

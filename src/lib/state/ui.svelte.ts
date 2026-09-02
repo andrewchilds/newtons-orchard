@@ -96,11 +96,12 @@ class UiState {
   bloom = $state(true);
 
   /**
-   * Gravitational lensing around black holes. Off by default: it bends the
-   * very orbit geometry this sim exists to make legible, and the screen-space
-   * approximation overstates the bending of the hole's own satellites.
+   * Gravitational lensing around black holes. Only a black hole triggers the
+   * pass, so it costs nothing elsewhere. Off is the escape hatch when the warp
+   * obscures the orbit geometry: the screen-space approximation overstates the
+   * bending of the hole's own satellites.
    */
-  lensing = $state(false);
+  lensing = $state(true);
 
   /**
    * Hide every floating control and leave the bare scene. Also what the

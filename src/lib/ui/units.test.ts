@@ -3,6 +3,7 @@ import {
   cameraAngles,
   distanceFromSi,
   distanceToSi,
+  formatCameraDistance,
   formatDegrees,
   formatPeriod,
   fromAu,
@@ -116,6 +117,23 @@ describe('cameraAngles', () => {
     const far = cameraAngles(300, 400, 500);
     expect(far.azimuth).toBeCloseTo(near.azimuth, 9);
     expect(far.elevation).toBeCloseTo(near.elevation, 9);
+  });
+});
+
+describe('formatCameraDistance', () => {
+  it('reads in AU at planetary scale', () => {
+    expect(formatCameraDistance(fromAu(1.234567))).toBe('1.23 AU');
+    expect(formatCameraDistance(fromAu(40))).toBe('40 AU');
+  });
+
+  it('drops to km below a tenth of an AU', () => {
+    expect(formatCameraDistance(fromKm(384400))).toBe('384,000 km');
+    expect(formatCameraDistance(fromKm(12.34))).toBe('12.3 km');
+  });
+
+  it('reports non-finite or negative input rather than printing NaN', () => {
+    expect(formatCameraDistance(NaN)).toBe('—');
+    expect(formatCameraDistance(-1)).toBe('—');
   });
 });
 

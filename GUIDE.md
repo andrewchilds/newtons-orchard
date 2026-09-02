@@ -349,11 +349,11 @@ Each of these cost real debugging time.
   a dark band on the Einstein ring (symptom: "record groove" rings).
   `sceneManager` hides meshes in `lensPass.activeIds` and restores them when
   the pass drops the hole. The pass forces the composer path even with bloom
-  off, so lensed frames always tone-map. Off by default (`ui.lensing`): it
-  bends the orbit geometry the sim exists to make legible. Toggle-off must go
-  through `lensPass.deactivate()` — a stale `activeIds` leaves holes invisible
-  with nothing drawing the silhouette. Thumbnails opt in per shot
-  (`PresetShot.lensing`).
+  off, so lensed frames always tone-map. On by default (`ui.lensing`); the
+  toggle exists because it bends the orbit geometry the sim exists to make
+  legible. Toggle-off must go through `lensPass.deactivate()` — a stale
+  `activeIds` leaves holes invisible with nothing drawing the silhouette.
+  Thumbnails can opt out per shot (`PresetShot.lensing`).
 - **`computeLineDistances` walks the whole position attribute** — an
   over-reserved buffer with a draw range injects a huge jump and the dash
   pattern collapses to a solid line. Dash colour is mixed 45% toward white — a

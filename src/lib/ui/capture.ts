@@ -67,7 +67,7 @@ function applyShot(shot: PresetShot): void {
   ui.showLabels = false;
   ui.showTrails = true;
   ui.parentRelativeTrails = shot.parentRelativeTrails ?? true;
-  ui.lensing = shot.lensing ?? false;
+  ui.lensing = shot.lensing ?? true;
 }
 
 /**

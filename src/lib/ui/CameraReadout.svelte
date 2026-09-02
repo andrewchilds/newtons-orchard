@@ -1,13 +1,14 @@
 <script lang="ts">
-  // Camera bearing, bottom-right. Deliberately faint — a watermark-weight
-  // orientation cue, not a control.
+  // Camera bearing and distance, bottom-right. Deliberately faint — a
+  // watermark-weight orientation cue, not a control.
   //
-  // Angles about the view center, not xyz distance: distance is apparent from
-  // the view itself, direction isn't. The axis buttons move the camera in these
-  // same terms, so a squared-up view reads as multiples of 90°.
+  // Angles about the view center rather than xyz: the axis buttons move the
+  // camera in these same terms, so a squared-up view reads as multiples of 90°.
+  // The distance is the zoom level — without it, the same framing of a moon
+  // and a planet look alike until a label gives the scale away.
 
   import { ui } from '../state/ui.svelte';
-  import { cameraAngles, formatDegrees } from './units';
+  import { cameraAngles, formatCameraDistance, formatDegrees } from './units';
 
   /**
    * Height of the time panel below, px. Measured by App rather than assumed
@@ -18,11 +19,13 @@
 
   const offset = $derived(ui.cameraOffset);
   const angles = $derived(cameraAngles(offset.x, offset.y, offset.z));
+  const distance = $derived(Math.hypot(offset.x, offset.y, offset.z));
 </script>
 
 <div class="camera-readout" aria-hidden="true" style:--clearance="{clearance}px">
-  <span class="angle" title="Bearing around the vertical axis">az {formatDegrees(angles.azimuth)}</span>
-  <span class="angle" title="Angle above the x–y plane">el {formatDegrees(angles.elevation)}</span>
+  <span class="value" title="Bearing around the vertical axis">az {formatDegrees(angles.azimuth)}</span>
+  <span class="value" title="Angle above the x–y plane">el {formatDegrees(angles.elevation)}</span>
+  <span class="value" title="Camera distance from the view center">{formatCameraDistance(distance)}</span>
 </div>
 
 <style>
@@ -50,7 +53,7 @@
     user-select: none;
   }
 
-  .angle {
+  .value {
     color: var(--text-dim);
   }
 </style>
