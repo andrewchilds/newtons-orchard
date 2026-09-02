@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+screenshots
+.git
+.vscode
+.idea
+*.log
+npm-debug.log*
+.DS_Store
