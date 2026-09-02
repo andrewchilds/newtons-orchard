@@ -268,6 +268,78 @@ function makeValueNoise(rand: () => number, cu: number, cv: number): (u: number,
 
 // --- rings ----------------------------------------------------------------
 
+/** Star lights a ring shader considers; matches the scene's PointLight cap. */
+export const MAX_RING_LIGHTS = 3;
+
+/**
+ * Star positions and colors every ring shades against, shared by all `Rings`
+ * materials so the scene writes them once per frame. Positions are world scene
+ * units; colors are light color × intensity, matching the PointLights that
+ * light the planets so a ring and its planet agree on brightness.
+ */
+export const ringLighting = {
+  count: { value: 0 },
+  positions: { value: Array.from({ length: MAX_RING_LIGHTS }, () => new THREE.Vector3()) },
+  colors: { value: Array.from({ length: MAX_RING_LIGHTS }, () => new THREE.Color(0, 0, 0)) },
+  ambient: { value: new THREE.Color(0, 0, 0) },
+};
+
+/**
+ * Lighting and shadow for a ring sheet, in place of MeshBasicMaterial's
+ * unlit output.
+ *
+ * Shadow maps can't do this: the scene spans nine orders of magnitude and a
+ * planet is a fraction of a unit, so no shadow camera resolves it. The ring
+ * instead ray-tests each fragment against its own planet — the mesh is a
+ * child of the body group at the body's center, scaled to the drawn radius,
+ * so the model matrix already carries both.
+ *
+ * Shading: a ring is a sheet of particles, not a surface, and ring particles
+ * backscatter hard — Saturn's rings photograph about as bright as the planet
+ * with the Sun only ~15° above the ring plane. So the face toward the star
+ * takes a heavily softened cosine, `|n·l|^0.3`, plus a floor so a ring never
+ * drops to ambient outright; a true Lambert cosine made the rings vanish for
+ * most of an orbit. The face away from the star still shows light scattered
+ * through, at a fraction of that. Irradiance otherwise follows three's own
+ * convention (color × intensity, Lambert BRDF /π) so it matches the planet.
+ */
+const RING_VERTEX_GLSL = /* glsl */ `
+  vRingWorldPos = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+  vRingNormal = normalize( mat3( modelMatrix ) * vec3( 0.0, 0.0, 1.0 ) );
+  vBodyCenter = modelMatrix[3].xyz;
+  vBodyRadius = length( modelMatrix[0].xyz );
+`;
+
+const RING_FRAGMENT_GLSL = /* glsl */ `
+  vec3 ringLight = uRingAmbient;
+  vec3 toCamera = cameraPosition - vRingWorldPos;
+  float viewSide = dot( vRingNormal, toCamera );
+  for ( int i = 0; i < ${MAX_RING_LIGHTS}; i++ ) {
+    if ( i >= uRingLightCount ) break;
+    vec3 toLight = uRingLightPos[ i ] - vRingWorldPos;
+    float lightDistance = length( toLight );
+    vec3 l = toLight / lightDistance;
+    float cosine = dot( vRingNormal, l );
+
+    // Is the planet between this fragment and the star? Closest approach of
+    // the ray to the planet's center, only counted ahead of the fragment and
+    // short of the star.
+    vec3 toCenter = vBodyCenter - vRingWorldPos;
+    float along = clamp( dot( toCenter, l ), 0.0, lightDistance );
+    float miss = length( toCenter - along * l );
+    // Feathered over about a pixel, so the terminator on the ring is
+    // antialiased rather than stair-stepped.
+    float edge = max( fwidth( miss ), vBodyRadius * 0.004 );
+    float unshadowed = smoothstep( vBodyRadius - edge, vBodyRadius + edge, miss );
+
+    float lit = 0.1 + 0.9 * pow( abs( cosine ), 0.3 );
+    // Viewer and star on opposite faces: light seen through the sheet.
+    if ( cosine * viewSide < 0.0 ) lit *= 0.4;
+    ringLight += uRingLightColor[ i ] * lit * unshadowed;
+  }
+  outgoingLight = diffuseColor.rgb * ringLight * RECIPROCAL_PI;
+`;
+
 /**
  * A flat, double-sided, semi-transparent ring from RingGeometry, with a radial
  * density profile mapped into concentric bands so it doesn't read as a disc.
@@ -301,6 +373,29 @@ export class Rings {
       side: THREE.DoubleSide,
       depthWrite: false,
     });
+    // An `onBeforeCompile` on MeshBasicMaterial rather than a raw
+    // ShaderMaterial keeps tone mapping and color space wired up (as the
+    // atmosphere rim does).
+    this.material.onBeforeCompile = (shader) => {
+      shader.uniforms.uRingLightCount = ringLighting.count;
+      shader.uniforms.uRingLightPos = ringLighting.positions;
+      shader.uniforms.uRingLightColor = ringLighting.colors;
+      shader.uniforms.uRingAmbient = ringLighting.ambient;
+
+      shader.vertexShader =
+        'varying vec3 vRingWorldPos;\nvarying vec3 vRingNormal;\n' +
+        'varying vec3 vBodyCenter;\nvarying float vBodyRadius;\n' +
+        shader.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>${RING_VERTEX_GLSL}`);
+
+      shader.fragmentShader =
+        `uniform int uRingLightCount;\nuniform vec3 uRingLightPos[${MAX_RING_LIGHTS}];\n` +
+        `uniform vec3 uRingLightColor[${MAX_RING_LIGHTS}];\nuniform vec3 uRingAmbient;\n` +
+        'varying vec3 vRingWorldPos;\nvarying vec3 vRingNormal;\n' +
+        'varying vec3 vBodyCenter;\nvarying float vBodyRadius;\n' +
+        shader.fragmentShader.replace('#include <opaque_fragment>', `${RING_FRAGMENT_GLSL}\n#include <opaque_fragment>`);
+    };
+    // One program for every ring: the patch is identical, the uniforms shared.
+    this.material.customProgramCacheKey = () => 'ring-lit';
 
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     // RingGeometry is built in the xy-plane; −90° about x lays it flat in the

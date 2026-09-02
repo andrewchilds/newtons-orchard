@@ -30,7 +30,7 @@ import {
 } from "./textures";
 import { Trails, type TrailAnchor } from "./trails";
 import { Picker, SelectionMarker } from "./picking";
-import { Atmosphere, CometTail, Rings, Spacecraft } from "./bodyEffects";
+import { Atmosphere, CometTail, MAX_RING_LIGHTS, Rings, Spacecraft, ringLighting } from "./bodyEffects";
 import { AccretionFlares, HabitableZones, MergeBursts, PlacementGhost, PredictionPath, VectorArrows } from "./overlays";
 import { BodyDots } from "./bodyDots";
 import { LensingPass, type LensSource } from "./lensing";
@@ -69,7 +69,8 @@ function samplesForDays(days: number, interval: number): number {
 }
 
 /** At most this many PointLights; beyond it, extra stars are emissive only. */
-const MAX_STAR_LIGHTS = 3;
+// Also the ring shaders' cap: a star past it lights nothing, ring included.
+const MAX_STAR_LIGHTS = MAX_RING_LIGHTS;
 
 /** How hard a star's surface glows (and how much the bloom pass catches). */
 const STAR_EMISSIVE_INTENSITY = 1.6;
@@ -813,6 +814,7 @@ export class SceneManager {
 		this.dots.commit();
 		this.habitableZones.commit();
 		this.updateCometTails(alive, pos, stars, pxPerRadian);
+		this.updateRingLighting();
 
 		this.vectors.setVisible(settings.showVectors);
 		this.bursts.update(simTime, this.refPosition, this.bodyScaleHint(alive, radius, settings));
@@ -973,6 +975,24 @@ export class SceneManager {
 	 * Distance is in true meters, not exaggerated scene units: activity is a
 	 * physical relationship to the star, not a visual one.
 	 */
+	/**
+	 * Mirror the frame's active star lights into the shared ring uniforms.
+	 * Only the lights actually shining count — a star past the PointLight cap
+	 * doesn't light the planet either, so it shouldn't light the ring.
+	 */
+	private updateRingLighting(): void {
+		let n = 0;
+		for (const visual of this.visuals.values()) {
+			const light = visual.light;
+			if (!light || !light.visible || n >= MAX_RING_LIGHTS) continue;
+			ringLighting.positions.value[n].copy(light.position);
+			ringLighting.colors.value[n].copy(light.color).multiplyScalar(light.intensity);
+			n += 1;
+		}
+		ringLighting.count.value = n;
+		ringLighting.ambient.value.copy(this.ambient.color).multiplyScalar(this.ambient.intensity);
+	}
+
 	private updateCometTails(
 		alive: readonly string[],
 		pos: Float64Array,
