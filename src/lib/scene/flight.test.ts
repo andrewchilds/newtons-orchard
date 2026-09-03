@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { Flight, FLIGHT_RATE, flightKeyFor } from './flight';
+import { Flight, FLIGHT_RATE, flightKeyFor, Orbit, ORBIT_RATE } from './flight';
 
 const FORWARD = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
@@ -114,5 +114,74 @@ describe('Flight', () => {
 
   it('exports a positive distance-scaled rate for the caller', () => {
     expect(FLIGHT_RATE).toBeGreaterThan(0);
+  });
+});
+
+describe('Orbit', () => {
+  const RATE = 1;
+
+  /** Run `seconds` of orbit at 60 Hz about the origin from a camera on +Z. */
+  function swing(orbit: Orbit, seconds: number) {
+    const target = new THREE.Vector3();
+    const position = new THREE.Vector3(0, 0, 10);
+    const up = new THREE.Vector3(0, 1, 0);
+    const right = new THREE.Vector3();
+    const dt = 1 / 60;
+    for (let t = 0; t < seconds - 1e-9; t += dt) {
+      // Right = view × up, recomputed each step as the camera's basis would be.
+      right.copy(target).sub(position).normalize().cross(up).normalize();
+      orbit.step(dt, RATE, target, up, right, position);
+    }
+    return { position, up };
+  }
+
+  it('does nothing at rest and leaves the camera where it was', () => {
+    const orbit = new Orbit();
+    const position = new THREE.Vector3(0, 0, 10);
+    const up = new THREE.Vector3(0, 1, 0);
+    expect(
+      orbit.step(1 / 60, RATE, new THREE.Vector3(), up, new THREE.Vector3(1, 0, 0), position)
+    ).toBe(false);
+    expect(position.z).toBe(10);
+    expect(orbit.active).toBe(false);
+  });
+
+  it('right swings the camera toward its right, keeping its distance', () => {
+    const orbit = new Orbit();
+    orbit.press('right');
+    const { position, up } = swing(orbit, 1);
+    // From +Z looking at the origin with +Y up, the camera's right is +X.
+    expect(position.x).toBeGreaterThan(1);
+    expect(position.y).toBeCloseTo(0, 6);
+    expect(position.length()).toBeCloseTo(10, 6);
+    // A yaw leaves up alone.
+    expect(up.y).toBeCloseTo(1, 6);
+  });
+
+  it('forward lifts the camera over the target and tilts up with it', () => {
+    const orbit = new Orbit();
+    orbit.press('forward');
+    const { position, up } = swing(orbit, 1);
+    expect(position.y).toBeGreaterThan(1);
+    expect(position.x).toBeCloseTo(0, 6);
+    expect(position.length()).toBeCloseTo(10, 6);
+    // Up tips back toward -Z as the camera climbs, staying perpendicular to
+    // the view — otherwise lookAt would re-level against the old up.
+    expect(up.z).toBeLessThan(-0.1);
+    expect(Math.abs(up.dot(position))).toBeLessThan(1e-6);
+  });
+
+  it('glides to rest after release', () => {
+    const orbit = new Orbit();
+    orbit.press('right');
+    swing(orbit, 1);
+    orbit.release('right');
+    swing(orbit, 2);
+    expect(orbit.active).toBe(false);
+  });
+
+  it('exports a rate a full circuit takes several seconds at', () => {
+    expect(ORBIT_RATE).toBeGreaterThan(0);
+    expect((2 * Math.PI) / ORBIT_RATE).toBeGreaterThan(5);
   });
 });

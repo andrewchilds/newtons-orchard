@@ -4,7 +4,7 @@
   import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
   import { SCENE_SCALE, SceneManager } from './sceneManager';
   import { SceneInteraction } from './interaction';
-  import { Flight, FLIGHT_RATE, flightKeyFor } from './flight';
+  import { Flight, FLIGHT_RATE, flightKeyFor, Orbit, ORBIT_RATE } from './flight';
   import { dominantAttractor } from '../physics/orbitInfo';
   import { sim } from '../state/simInstance';
   import { tick, time } from '../state/time.svelte';
@@ -476,11 +476,13 @@
       manager.addMergeBurst(event.t, at.x, at.y, at.z, color);
     });
 
-    // --- arrow-key flight -------------------------------------------------
+    // --- arrow-key flight and orbit ---------------------------------------
     // Fly the camera like a spaceship: arrows translate camera and target
     // together — a pan in effect, so orbit, zoom and follows keep composing —
-    // with the ramp-in/glide-out smoothing living in scene/flight.ts.
+    // with the ramp-in/glide-out smoothing living in scene/flight.ts. Shift
+    // swaps the same keys for a slow orbit about the target.
     const flight = new Flight();
+    const orbit = new Orbit();
     const flightForward = new THREE.Vector3();
     const flightRight = new THREE.Vector3();
     const flightStep = new THREE.Vector3();
@@ -488,13 +490,21 @@
     const onFlightKeyDown = (e: KeyboardEvent) => {
       // defaultPrevented: a focused control that already consumed the arrow
       // (the shuttle, a number field) keeps it. Modified arrows are browser
-      // and OS shortcuts — all but Shift, which is the pan modifier and can
-      // reasonably be down mid-flight.
+      // and OS shortcuts — all but Shift, which is ours.
       if (e.defaultPrevented || isTypingTarget(e.target)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = flightKeyFor(e.key);
       if (!key) return;
-      flight.press(key);
+      // Auto-repeat keeps firing keydown while the arrow is held, so pressing
+      // or lifting Shift mid-hold lands here and switches drives. The other
+      // drive must let go, or the camera flies and orbits at once.
+      if (e.shiftKey) {
+        orbit.press(key);
+        flight.release(key);
+      } else {
+        flight.press(key);
+        orbit.release(key);
+      }
       // A button move in flight would fight the keys, and the hand wins.
       cameraTween = null;
       // Arrows scroll whatever container can scroll otherwise.
@@ -503,11 +513,16 @@
     const onFlightKeyUp = (e: KeyboardEvent) => {
       // Unconditional — the matching keydown may have been consumed by a
       // control that has since lost focus, and a missed release wedges the
-      // camera in motion.
+      // camera in motion. Both drives: Shift may have changed since the press.
       const key = flightKeyFor(e.key);
-      if (key) flight.release(key);
+      if (!key) return;
+      flight.release(key);
+      orbit.release(key);
     };
-    const onFlightBlur = () => flight.releaseAll();
+    const onFlightBlur = () => {
+      flight.releaseAll();
+      orbit.releaseAll();
+    };
     window.addEventListener('keydown', onFlightKeyDown);
     window.addEventListener('keyup', onFlightKeyUp);
     window.addEventListener('blur', onFlightBlur);
@@ -809,6 +824,17 @@
         manager.camera.position.add(flightStep);
         controls.target.add(flightStep);
       }
+      // Shift-arrow orbit. The translation above leaves the camera's basis
+      // untouched, so `flightRight` is still this frame's right; controls.update
+      // below re-aims the camera at the target from wherever this leaves it.
+      orbit.step(
+        wallDelta,
+        ORBIT_RATE,
+        controls.target,
+        manager.camera.up,
+        flightRight,
+        manager.camera.position
+      );
 
       controls.update();
 
@@ -821,7 +847,10 @@
       // nothing per-frame goes through reactivity.
       const gesture =
         gestureInternals.keyState !== STATE_NONE ? gestureInternals.keyState : gestureInternals.state;
-      const rotating = gesture === STATE_ROTATE || gesture === STATE_TOUCH_ROTATE;
+      // Keyboard orbiting shows the pivot too — it's the same question, "what
+      // am I swinging around?"
+      const rotating =
+        gesture === STATE_ROTATE || gesture === STATE_TOUCH_ROTATE || orbit.active;
       if (rotating !== pivotShown) {
         pivotShown = rotating;
         pivotMarker.classList.toggle('visible', rotating);
@@ -857,6 +886,7 @@
         !time.computing &&
         cameraTween === null &&
         !flight.active &&
+        !orbit.active &&
         now - lastActivity > IDLE_RENDER_DELAY_MS;
 
       if (!idle) {
