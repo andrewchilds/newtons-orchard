@@ -152,8 +152,6 @@
     <input type="checkbox" bind:checked={ui.lensing} />
     <span>Gravitational lensing</span>
   </label>
-
-  <p class="note">Radii are exaggerated for visibility; distances are true to scale.</p>
 </div>
 
 <style>
@@ -226,14 +224,6 @@
   input[type='checkbox'],
   input[type='radio'] {
     accent-color: var(--accent);
-  }
-
-  .note {
-    margin: 0;
-    font-size: 11px;
-    line-height: 1.35;
-    color: var(--text-dim);
-    opacity: 0.8;
   }
 
   /* Marks a toggle that only affects the currently selected body. */
