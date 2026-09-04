@@ -4,7 +4,17 @@
   import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
   import { SCENE_SCALE, SceneManager } from './sceneManager';
   import { SceneInteraction } from './interaction';
-  import { Flight, FLIGHT_RATE, flightKeyFor, Orbit, ORBIT_RATE } from './flight';
+  import {
+    Flight,
+    FLIGHT_RATE,
+    flightKeyFor,
+    Orbit,
+    ORBIT_RATE,
+    Zoom,
+    ZOOM_RATE,
+    zoomKeyFor,
+    zoomKeyForCode,
+  } from './flight';
   import { dominantAttractor } from '../physics/orbitInfo';
   import { sim } from '../state/simInstance';
   import { tick, time } from '../state/time.svelte';
@@ -476,33 +486,48 @@
       manager.addMergeBurst(event.t, at.x, at.y, at.z, color);
     });
 
-    // --- arrow-key flight and orbit ---------------------------------------
+    // --- key-driven flight, orbit and zoom --------------------------------
     // Fly the camera like a spaceship: arrows translate camera and target
     // together — a pan in effect, so orbit, zoom and follows keep composing —
-    // with the ramp-in/glide-out smoothing living in scene/flight.ts. Shift
-    // swaps the same keys for a slow orbit about the target.
+    // with the ramp-in/glide-out smoothing living in scene/flight.ts. Option
+    // turns the up/down arrows into climb/descend, Shift swaps the same keys
+    // for a slow orbit about the target, and plus/minus dolly in and out.
     const flight = new Flight();
     const orbit = new Orbit();
+    const zoom = new Zoom();
     const flightForward = new THREE.Vector3();
     const flightRight = new THREE.Vector3();
+    const flightUp = new THREE.Vector3();
     const flightStep = new THREE.Vector3();
+    const zoomOffset = new THREE.Vector3();
 
     const onFlightKeyDown = (e: KeyboardEvent) => {
-      // defaultPrevented: a focused control that already consumed the arrow
-      // (the shuttle, a number field) keeps it. Modified arrows are browser
-      // and OS shortcuts — all but Shift, which is ours.
+      // defaultPrevented: a focused control that already consumed the key
+      // (the shuttle, a number field) keeps it. Command and Control chords
+      // are browser and OS shortcuts — Cmd+minus is the page zoom.
       if (e.defaultPrevented || isTypingTarget(e.target)) return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const key = flightKeyFor(e.key);
+      if (e.metaKey || e.ctrlKey) return;
+      const zoomKey = zoomKeyFor(e.key);
+      if (zoomKey) {
+        // Option+minus types an en dash on a Mac, so the key never matches
+        // here; on other layouts Alt chords are menu accelerators.
+        if (e.altKey) return;
+        zoom.press(zoomKey);
+        cameraTween = null;
+        return;
+      }
+      const key = flightKeyFor(e.key, e.altKey);
       if (!key) return;
       // Auto-repeat keeps firing keydown while the arrow is held, so pressing
-      // or lifting Shift mid-hold lands here and switches drives. The other
-      // drive must let go, or the camera flies and orbits at once.
-      if (e.shiftKey) {
+      // or lifting a modifier mid-hold lands here and switches drives or
+      // axes. The others must let go, or the camera flies and orbits at once.
+      const other = flightKeyFor(e.key, !e.altKey)!;
+      if (e.shiftKey && !e.altKey) {
         orbit.press(key);
         flight.release(key);
       } else {
         flight.press(key);
+        flight.release(other);
         orbit.release(key);
       }
       // A button move in flight would fight the keys, and the hand wins.
@@ -513,15 +538,25 @@
     const onFlightKeyUp = (e: KeyboardEvent) => {
       // Unconditional — the matching keydown may have been consumed by a
       // control that has since lost focus, and a missed release wedges the
-      // camera in motion. Both drives: Shift may have changed since the press.
+      // camera in motion. Every drive and both axes: the modifiers may have
+      // changed since the press.
+      // By key and by physical code: pressing Option after the key changes
+      // what the release reports (minus comes back as an en dash on a Mac).
+      const zoomKey = zoomKeyFor(e.key) ?? zoomKeyForCode(e.code);
+      if (zoomKey) {
+        zoom.release(zoomKey);
+        return;
+      }
       const key = flightKeyFor(e.key);
       if (!key) return;
       flight.release(key);
+      flight.release(flightKeyFor(e.key, true)!);
       orbit.release(key);
     };
     const onFlightBlur = () => {
       flight.releaseAll();
       orbit.releaseAll();
+      zoom.releaseAll();
     };
     window.addEventListener('keydown', onFlightKeyDown);
     window.addEventListener('keyup', onFlightKeyUp);
@@ -819,10 +854,22 @@
       // preserves.
       manager.camera.getWorldDirection(flightForward);
       flightRight.setFromMatrixColumn(manager.camera.matrixWorld, 0);
+      flightUp.setFromMatrixColumn(manager.camera.matrixWorld, 1);
       const flightSpeed = manager.camera.position.distanceTo(controls.target) * FLIGHT_RATE;
-      if (flight.step(wallDelta, flightForward, flightRight, flightSpeed, flightStep)) {
+      if (flight.step(wallDelta, flightForward, flightRight, flightUp, flightSpeed, flightStep)) {
         manager.camera.position.add(flightStep);
         controls.target.add(flightStep);
+      }
+      // Plus/minus zoom: scale the offset from the target, clamped to the same
+      // range the wheel and the buttons obey.
+      const zoomFactor = zoom.step(wallDelta, ZOOM_RATE);
+      if (zoomFactor !== 1) {
+        zoomOffset.subVectors(manager.camera.position, controls.target);
+        const next = Math.min(
+          Math.max(zoomOffset.length() * zoomFactor, controls.minDistance),
+          controls.maxDistance
+        );
+        manager.camera.position.copy(controls.target).add(zoomOffset.setLength(next));
       }
       // Shift-arrow orbit. The translation above leaves the camera's basis
       // untouched, so `flightRight` is still this frame's right; controls.update
@@ -887,6 +934,7 @@
         cameraTween === null &&
         !flight.active &&
         !orbit.active &&
+        !zoom.active &&
         now - lastActivity > IDLE_RENDER_DELAY_MS;
 
       if (!idle) {

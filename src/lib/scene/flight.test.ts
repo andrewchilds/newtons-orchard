@@ -1,9 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { Flight, FLIGHT_RATE, flightKeyFor, Orbit, ORBIT_RATE } from './flight';
+import {
+  Flight,
+  FLIGHT_RATE,
+  flightKeyFor,
+  Orbit,
+  ORBIT_RATE,
+  Zoom,
+  ZOOM_RATE,
+  zoomKeyFor,
+  zoomKeyForCode,
+} from './flight';
 
 const FORWARD = new THREE.Vector3(0, 1, 0);
 const RIGHT = new THREE.Vector3(1, 0, 0);
+const UP = new THREE.Vector3(0, 0, 1);
 const SPEED = 100;
 
 /** Run `seconds` of flight in fixed steps, summing the translation. */
@@ -11,7 +22,7 @@ function fly(flight: Flight, seconds: number, dt = 1 / 60): THREE.Vector3 {
   const total = new THREE.Vector3();
   const step = new THREE.Vector3();
   for (let t = 0; t < seconds - 1e-9; t += dt) {
-    if (flight.step(dt, FORWARD, RIGHT, SPEED, step)) total.add(step);
+    if (flight.step(dt, FORWARD, RIGHT, UP, SPEED, step)) total.add(step);
   }
   return total;
 }
@@ -25,13 +36,40 @@ describe('flightKeyFor', () => {
     expect(flightKeyFor('w')).toBeNull();
     expect(flightKeyFor(' ')).toBeNull();
   });
+
+  it('turns up and down vertical, leaving left and right alone', () => {
+    expect(flightKeyFor('ArrowUp', true)).toBe('up');
+    expect(flightKeyFor('ArrowDown', true)).toBe('down');
+    expect(flightKeyFor('ArrowLeft', true)).toBe('left');
+    expect(flightKeyFor('ArrowRight', true)).toBe('right');
+    expect(flightKeyFor('w', true)).toBeNull();
+  });
+});
+
+describe('zoomKeyFor', () => {
+  it('maps plus and minus with and without Shift', () => {
+    expect(zoomKeyFor('+')).toBe('in');
+    expect(zoomKeyFor('=')).toBe('in');
+    expect(zoomKeyFor('-')).toBe('out');
+    expect(zoomKeyFor('_')).toBe('out');
+    expect(zoomKeyFor('0')).toBeNull();
+    expect(zoomKeyFor('ArrowUp')).toBeNull();
+  });
+
+  it('maps the physical keys for releases', () => {
+    expect(zoomKeyForCode('Equal')).toBe('in');
+    expect(zoomKeyForCode('NumpadAdd')).toBe('in');
+    expect(zoomKeyForCode('Minus')).toBe('out');
+    expect(zoomKeyForCode('NumpadSubtract')).toBe('out');
+    expect(zoomKeyForCode('KeyA')).toBeNull();
+  });
 });
 
 describe('Flight', () => {
   it('does nothing with no keys held', () => {
     const flight = new Flight();
     const step = new THREE.Vector3(9, 9, 9);
-    expect(flight.step(1 / 60, FORWARD, RIGHT, SPEED, step)).toBe(false);
+    expect(flight.step(1 / 60, FORWARD, RIGHT, UP, SPEED, step)).toBe(false);
     // A false return must leave `out` untouched — the caller skips the write.
     expect(step.x).toBe(9);
     expect(flight.active).toBe(false);
@@ -61,7 +99,7 @@ describe('Flight', () => {
     expect(glide.y).toBeLessThan(SPEED * 0.5);
     expect(flight.active).toBe(false);
     const step = new THREE.Vector3();
-    expect(flight.step(1 / 60, FORWARD, RIGHT, SPEED, step)).toBe(false);
+    expect(flight.step(1 / 60, FORWARD, RIGHT, UP, SPEED, step)).toBe(false);
   });
 
   it('cruises a diagonal no faster than a straight run', () => {
@@ -82,6 +120,21 @@ describe('Flight', () => {
     expect(fly(flight, 1).length()).toBe(0);
   });
 
+  it('climbs along up, and no faster on a diagonal', () => {
+    const climb = new Flight();
+    climb.press('up');
+    const travelled = fly(climb, 2);
+    expect(travelled.x).toBeCloseTo(0, 6);
+    expect(travelled.y).toBeCloseTo(0, 6);
+    expect(travelled.z).toBeGreaterThan(SPEED * 1.7);
+
+    const diagonal = new Flight();
+    diagonal.press('up');
+    diagonal.press('forward');
+    diagonal.press('right');
+    expect(fly(diagonal, 2).length()).toBeCloseTo(travelled.length(), 6);
+  });
+
   it('covers the same ground regardless of frame rate', () => {
     const at60 = new Flight();
     at60.press('forward');
@@ -99,7 +152,7 @@ describe('Flight', () => {
     fly(flight, 2);
     const step = new THREE.Vector3();
     // A 5 s hiccup (tab backgrounded) must not translate 5 s of cruise at once.
-    flight.step(5, FORWARD, RIGHT, SPEED, step);
+    flight.step(5, FORWARD, RIGHT, UP, SPEED, step);
     expect(step.y).toBeLessThan(SPEED * 0.2);
   });
 
@@ -183,5 +236,46 @@ describe('Orbit', () => {
   it('exports a rate a full circuit takes several seconds at', () => {
     expect(ORBIT_RATE).toBeGreaterThan(0);
     expect((2 * Math.PI) / ORBIT_RATE).toBeGreaterThan(5);
+  });
+});
+
+describe('Zoom', () => {
+  /** Run `seconds` at 60 Hz, returning the product of every frame's factor. */
+  function dolly(zoom: Zoom, seconds: number): number {
+    let factor = 1;
+    const dt = 1 / 60;
+    for (let t = 0; t < seconds - 1e-9; t += dt) factor *= zoom.step(dt, ZOOM_RATE);
+    return factor;
+  }
+
+  it('reports exactly 1 at rest so the caller can skip the write', () => {
+    const zoom = new Zoom();
+    expect(zoom.step(1 / 60, ZOOM_RATE)).toBe(1);
+    expect(zoom.active).toBe(false);
+  });
+
+  it('shrinks the distance in and grows it out, symmetrically', () => {
+    const zoomIn = new Zoom();
+    zoomIn.press('in');
+    const zoomOut = new Zoom();
+    zoomOut.press('out');
+    const a = dolly(zoomIn, 2);
+    const b = dolly(zoomOut, 2);
+    expect(a).toBeLessThan(1);
+    expect(b).toBeGreaterThan(1);
+    expect(a * b).toBeCloseTo(1, 6);
+    // Two seconds of cruise minus the ramp-in, in e-folds.
+    expect(-Math.log(a)).toBeGreaterThan(ZOOM_RATE * 1.7);
+    expect(-Math.log(a)).toBeLessThan(ZOOM_RATE * 2);
+  });
+
+  it('glides to rest after release', () => {
+    const zoom = new Zoom();
+    zoom.press('in');
+    dolly(zoom, 1);
+    zoom.release('in');
+    dolly(zoom, 2);
+    expect(zoom.active).toBe(false);
+    expect(zoom.step(1 / 60, ZOOM_RATE)).toBe(1);
   });
 });
