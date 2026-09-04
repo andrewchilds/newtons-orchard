@@ -29,7 +29,7 @@
 		class:guide-glow={missionGuide.target?.kind === "play"}
 		onclick={() => (time.playing = !time.playing)}
 		{disabled}
-		title={time.playing ? "Pause" : "Play"}
+		title={time.playing ? "Pause (Space)" : "Play (Space)"}
 		aria-label={time.playing ? "Pause" : "Play"}
 	>
 		<!-- Filled rather than outline: at 17px a hollow triangle reads as a

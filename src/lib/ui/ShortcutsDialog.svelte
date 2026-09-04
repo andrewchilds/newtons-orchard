@@ -58,6 +58,7 @@
 		{
 			title: "Time",
 			shortcuts: [
+				{ keys: [["Space"]], does: "Play and pause" },
 				{ keys: [["←"], ["→"]], does: "Scrub backward and forward, with the shuttle focused" },
 				{ keys: [["Home"], ["Esc"]], does: "Let the shuttle settle back to center" }
 			]

@@ -34,6 +34,7 @@
 		redo
 	} from "./lib/state/system.svelte";
 	import { historyShortcut } from "./lib/state/history.svelte";
+	import { time } from "./lib/state/time.svelte";
 	import { sharedSystem, sim } from "./lib/state/simInstance";
 	import { formatSimDate } from "./lib/ui/formatTime";
 	import { installCaptureApi, isCaptureRun } from "./lib/ui/capture";
@@ -75,7 +76,37 @@
 	const placementParent = $derived(system.byId(ui.placementParentId));
 	const activeMission = $derived(mission.active);
 
+	// A focused control owns its own Space: a button activates on it (a focused
+	// Play button would toggle twice in one press), a field types it, and any
+	// custom focusable — the shuttle, a slider — may bind it. Only Space
+	// landing on nothing in particular is the transport shortcut.
+	function ownsSpace(target: EventTarget | null): boolean {
+		return (
+			target instanceof HTMLElement &&
+			target.closest("button, a, input, textarea, select, summary, [contenteditable], [tabindex]") !== null
+		);
+	}
+
 	function onKeydown(event: KeyboardEvent) {
+		// Space plays and pauses. Not while the shuttle is held — it governs time
+		// outright then, and the Play button is disabled to say so. `repeat`
+		// guard: a held key would otherwise flicker the clock on and off.
+		if (
+			event.key === " " &&
+			!event.repeat &&
+			!event.defaultPrevented &&
+			!event.metaKey &&
+			!event.ctrlKey &&
+			!event.altKey &&
+			!event.shiftKey &&
+			!ownsSpace(event.target)
+		) {
+			// Space scrolls the page otherwise.
+			event.preventDefault();
+			if (!time.shuttleHeld) time.playing = !time.playing;
+			return;
+		}
+
 		// An armed placement owns the cursor, so Escape cancels it first.
 		if (event.key === "Escape" && ui.placementType !== null) {
 			ui.cancelPlacement();
