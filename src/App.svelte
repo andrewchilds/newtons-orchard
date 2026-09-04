@@ -14,6 +14,7 @@
 	import MissionDebriefDialog from "./lib/ui/MissionDebriefDialog.svelte";
 	import MissionSteps from "./lib/ui/MissionSteps.svelte";
 	import AboutDialog from "./lib/ui/AboutDialog.svelte";
+	import ShortcutsDialog from "./lib/ui/ShortcutsDialog.svelte";
 	import SystemJsonDialog from "./lib/ui/SystemJsonDialog.svelte";
 	import WelcomeDialog from "./lib/ui/WelcomeDialog.svelte";
 	import Toasts from "./lib/ui/Toasts.svelte";
@@ -50,6 +51,7 @@
 	let missionsOpen = $state(false);
 	let debriefOpen = $state(false);
 	let aboutOpen = $state(false);
+	let shortcutsOpen = $state(false);
 	let jsonOpen = $state(false);
 	let jsonTab = $state<"export" | "import">("export");
 
@@ -282,10 +284,14 @@
      a containing block, trapping the fixed-position shelf inside a 40 px button.
      Never gated on `chromeHidden` — this component owns the autosave, so
      unmounting it would stop saving. -->
-<SystemShelf bind:open={systemOpen} bind:presetsOpen bind:missionsOpen bind:aboutOpen bind:jsonOpen bind:jsonTab />
+<SystemShelf bind:open={systemOpen} bind:presetsOpen bind:missionsOpen bind:aboutOpen bind:shortcutsOpen bind:jsonOpen bind:jsonTab />
 
 {#if aboutOpen}
 	<AboutDialog onclose={() => (aboutOpen = false)} />
+{/if}
+
+{#if shortcutsOpen}
+	<ShortcutsDialog onclose={() => (shortcutsOpen = false)} />
 {/if}
 
 {#if jsonOpen}

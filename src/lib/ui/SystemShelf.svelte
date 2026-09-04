@@ -47,6 +47,7 @@
 		presetsOpen = $bindable(false),
 		missionsOpen = $bindable(false),
 		aboutOpen = $bindable(false),
+		shortcutsOpen = $bindable(false),
 		jsonOpen = $bindable(false),
 		jsonTab = $bindable("export")
 	}: {
@@ -54,6 +55,7 @@
 		presetsOpen?: boolean;
 		missionsOpen?: boolean;
 		aboutOpen?: boolean;
+		shortcutsOpen?: boolean;
 		jsonOpen?: boolean;
 		jsonTab?: "export" | "import";
 	} = $props();
@@ -148,6 +150,11 @@
 	function openAbout() {
 		open = false;
 		aboutOpen = true;
+	}
+
+	function openShortcuts() {
+		open = false;
+		shortcutsOpen = true;
 	}
 
 	function save(name: string) {
@@ -359,6 +366,7 @@
 
 			<div class="sep" role="separator"></div>
 
+			<button class="item" onclick={openShortcuts}>Keyboard shortcuts</button>
 			<button class="item" onclick={openAbout}>About</button>
 		</div>
 	</aside>
