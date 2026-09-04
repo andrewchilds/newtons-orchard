@@ -521,13 +521,15 @@
       // Auto-repeat keeps firing keydown while the arrow is held, so pressing
       // or lifting a modifier mid-hold lands here and switches drives or
       // axes. The others must let go, or the camera flies and orbits at once.
+      // Left and right mean the same thing on both axes, so the release must
+      // come before the press or it undoes it.
       const other = flightKeyFor(e.key, !e.altKey)!;
       if (e.shiftKey && !e.altKey) {
         orbit.press(key);
         flight.release(key);
       } else {
-        flight.press(key);
         flight.release(other);
+        flight.press(key);
         orbit.release(key);
       }
       // A button move in flight would fight the keys, and the hand wins.
