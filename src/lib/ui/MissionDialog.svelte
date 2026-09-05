@@ -21,6 +21,7 @@
 	import { mission as missionState } from "../state/mission.svelte";
 	import { fade, scale } from "svelte/transition";
 	import { DIALOG_MS, DIALOG_SCALE, duration } from "./motion";
+	import { MISSION_IDEAS_MAILTO } from "./contact";
 
 	// The list renders in sections: consecutive missions sharing a `category`
 	// fall under one heading. MISSIONS keeps each category contiguous (tested),
@@ -224,6 +225,12 @@
 					{/each}
 				{/each}
 			</div>
+			<footer>
+				<p class="hint">
+					STEM teachers! What other missions should we add?
+					<a href={MISSION_IDEAS_MAILTO}>Email us</a>!
+				</p>
+			</footer>
 		{/if}
 	</div>
 </div>
@@ -296,6 +303,23 @@
 	.back:hover {
 		color: var(--text);
 		border-color: var(--border);
+	}
+
+	footer {
+		flex: none;
+		padding: 9px 12px;
+		border-top: 1px solid var(--border);
+	}
+
+	.hint {
+		margin: 0;
+		font-size: 11px;
+		color: var(--text-dim);
+	}
+
+	.hint a {
+		color: var(--accent);
+		text-decoration: underline;
 	}
 
 	.close {

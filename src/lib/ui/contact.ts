@@ -17,3 +17,5 @@ export const GALLERY_SUBMISSION_MAILTO = `mailto:${CONTACT_EMAIL}?${new URLSearc
 })
   .toString()
   .replaceAll('+', '%20')}`;
+
+export const MISSION_IDEAS_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Mission ideas')}`;
