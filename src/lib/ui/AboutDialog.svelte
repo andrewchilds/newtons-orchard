@@ -2,8 +2,7 @@
 	import { TreeDeciduous } from "lucide-svelte";
 	import { fade, scale } from "svelte/transition";
 	import { DIALOG_MS, DIALOG_SCALE, duration } from "./motion";
-	import { GALLERY_FORM_URL } from "../presets/gallery";
-	import { CONTACT_EMAIL } from "./contact";
+	import { CONTACT_EMAIL, GALLERY_SUBMISSION_MAILTO } from "./contact";
 
 	interface Props {
 		onclose: () => void;
@@ -92,9 +91,10 @@
 				</p>
 
 				<p>
-					Built a system worth sharing? Send it to the gallery through
-					<a href={GALLERY_FORM_URL} target="_blank" rel="noopener">the submission form</a>. Questions and comments
-					can be directed to the author by <a href="mailto:{CONTACT_EMAIL}">email</a>.
+					Built a system worth sharing? Copy a share link from the system menu and
+					<a href={GALLERY_SUBMISSION_MAILTO}>email it to us</a> with your name, the system’s name, and what
+					makes it interesting. Questions and comments can be directed to the author by
+					<a href="mailto:{CONTACT_EMAIL}">email</a>.
 				</p>
 			</div>
 		{:else}

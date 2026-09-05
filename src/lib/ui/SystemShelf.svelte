@@ -38,7 +38,7 @@
 		writeAutosave,
 		type SaveSlot
 	} from "../storage/persistence";
-	import { shareUrlFor } from "../storage/shareUrl";
+	import { copyShareLink } from "./shareLink";
 
 	// Bindable so the owner can drive the open state — the toggle in the menu
 	// bar is a separate component, and App holds the flag between them.
@@ -212,22 +212,8 @@
 		jsonOpen = true;
 	}
 
-	// One catch for both ways this can fail: no `CompressionStream` (old
-	// browser) and a denied clipboard write.
 	async function onCopyShareLink() {
-		try {
-			const link = await shareUrlFor(currentSystemFile());
-			await navigator.clipboard.writeText(link);
-			toast(
-				"ok",
-				link.length > 2000
-					? `Share link copied — it's ${Math.round(link.length / 1000)}k characters, so chat apps may truncate it.`
-					: "Share link copied."
-			);
-			open = false;
-		} catch {
-			toast("error", "Could not copy a share link in this browser.");
-		}
+		if (await copyShareLink()) open = false;
 	}
 
 	function focusOnMount(node: HTMLInputElement) {

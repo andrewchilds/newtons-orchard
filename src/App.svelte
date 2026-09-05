@@ -39,6 +39,7 @@
 	import { formatSimDate } from "./lib/ui/formatTime";
 	import { installCaptureApi, isCaptureRun } from "./lib/ui/capture";
 	import { hasBeenWelcomed, markWelcomed } from "./lib/storage/persistence";
+	import { copyShareLink } from "./lib/ui/shareLink";
 	import { slide } from "svelte/transition";
 	import { PANEL_MS, duration } from "./lib/ui/motion";
 	import type { MergeEvent } from "./lib/sim/simulation";
@@ -357,13 +358,7 @@
 			loadSystemIntoUi(file.bodies, entry.name, file.settings, { kind: "gallery", id: entry.id });
 			presetsOpen = false;
 		}}
-		onsubmit={() => {
-			// "Submit yours": hand off to the JSON dialog's Export tab, where the
-			// copyable JSON lives.
-			presetsOpen = false;
-			jsonTab = "export";
-			jsonOpen = true;
-		}}
+		oncopylink={() => void copyShareLink()}
 		onclose={() => (presetsOpen = false)}
 	/>
 {/if}

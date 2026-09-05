@@ -20,7 +20,7 @@ npm run preset-screenshots -- --missions      # regenerate mission card portrait
 npm run preset-screenshots -- --gallery       # regenerate user-gallery thumbnails
 npm run bake-textures [-- <type>… --jobs N]   # regenerate public/textures/
 
-npm run gallery-add -- <file.json> --id <id> --by "Name" --from "Place" --blurb "…"
+npm run gallery-add -- <share-url | file.json> --id <id> --by "Name" --from "Place" --blurb "…"
                  # add a reviewed submission to the user-systems gallery
 ```
 

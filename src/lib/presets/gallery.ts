@@ -6,16 +6,15 @@
 // through `parseSystemFile` like any untrusted import, so the cold page load
 // carries a few strings per entry rather than every submitted roster.
 //
-// Nothing lands here directly from a submission: entries are hand-reviewed and
-// added with `npm run gallery-add`, which validates the JSON, writes the file
-// and appends the metadata entry below. Thumbnails at `public/gallery/<id>.jpg`
+// Nothing lands here directly from a submission: people email a share link
+// (see `GALLERY_SUBMISSION_MAILTO`), entries are hand-reviewed and added with
+// `npm run gallery-add`, which decodes the link, validates the system, writes
+// the file and appends the metadata entry below. Thumbnails at `public/gallery/<id>.jpg`
 // come from `npm run preset-screenshots -- --gallery`, framed by each entry's
 // `shot` exactly as preset thumbnails are (see `PresetShot` in `examples.ts`).
 // `gallery.test.ts` keeps the three pieces — entry, JSON, thumbnail — in sync.
 
 import type { PresetShot } from "./examples";
-
-export const GALLERY_FORM_URL = "https://forms.gle/HdE52KXWQtwvGTze9";
 
 export interface GalleryEntry {
 	/** Filename stem of `public/gallery/<id>.json` and `<id>.jpg`. */

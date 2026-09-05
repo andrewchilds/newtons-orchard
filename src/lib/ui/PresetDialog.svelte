@@ -14,11 +14,11 @@
 	// an error toast — the grid stays up and nothing else breaks.
 
 	import { PRESETS, type Preset } from "../presets/examples";
-	import { GALLERY, GALLERY_FORM_URL, type GalleryEntry } from "../presets/gallery";
+	import { GALLERY, type GalleryEntry } from "../presets/gallery";
 	import { mission } from "../state/mission.svelte";
 	import { toast } from "../state/toasts.svelte";
 	import { ImportError, parseSystemFile } from "../storage/persistence";
-	import { CONTACT_EMAIL } from "./contact";
+	import { GALLERY_SUBMISSION_MAILTO } from "./contact";
 	import type { SystemFile } from "../types";
 	import { fade, scale } from "svelte/transition";
 	import { DIALOG_MS, DIALOG_SCALE, duration } from "./motion";
@@ -27,12 +27,12 @@
 		onpick: (preset: Preset) => void;
 		/** A gallery entry's JSON, fetched and validated, ready to load. */
 		onpickgallery: (entry: GalleryEntry, file: SystemFile) => void;
-		/** "Submit yours" — hands off to the System JSON dialog's Export tab. */
-		onsubmit: () => void;
+		/** "Submit yours" — copies a share link for the current system. */
+		oncopylink: () => void;
 		onclose: () => void;
 	}
 
-	let { onpick, onpickgallery, onsubmit, onclose }: Props = $props();
+	let { onpick, onpickgallery, oncopylink, onclose }: Props = $props();
 
 	const TABS = [
 		{ id: "builtin", label: "Built-in" },
@@ -202,10 +202,9 @@
 			{:else}
 				<p class="hint">
 					Built something worth sharing?
-					<button class="submit-link" onclick={onsubmit}>Export your system’s JSON</button>
-					and send it through
-					<a href={GALLERY_FORM_URL} target="_blank" rel="noreferrer">the submission form</a>, or
-					<a href="mailto:{CONTACT_EMAIL}">email it to us</a>.
+					<button class="submit-link" onclick={oncopylink}>Copy a share link</button>
+					and <a href={GALLERY_SUBMISSION_MAILTO}>email it to us</a> with your name, the system’s
+					name, and what makes it interesting.
 				</p>
 			{/if}
 		</footer>

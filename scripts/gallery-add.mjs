@@ -1,11 +1,14 @@
 // Add a hand-reviewed submission to the user-systems gallery.
 //
-//   npm run gallery-add -- <file.json> --id <id> --by "Name" --from "Place" --blurb "..."
+//   npm run gallery-add -- <share-url | file.json> --id <id> --by "Name" --from "Place" --blurb "..."
 //
-// Validates the submitted JSON through the same `parseSystemFile` the app's
-// import path uses (so a file that passes here is a file the app will load),
-// writes the normalized result to `public/gallery/<id>.json`, and appends a
-// metadata entry to `src/lib/presets/gallery.ts` with a placeholder `shot`.
+// Submissions arrive by email as a share link, so the first argument is
+// usually that URL (quote it — the payload is long and `#` starts a shell
+// comment); a path to a JSON file works too. Either way the system goes
+// through the same decoding and `parseSystemFile` the app's import path uses
+// (so what passes here is what the app will load), the normalized result is
+// written to `public/gallery/<id>.json`, and a metadata entry is appended to
+// `src/lib/presets/gallery.ts` with a placeholder `shot`.
 //
 // `--by` and `--from` are optional; `--id` and `--blurb` are not. The id is the
 // filename stem for both the JSON and the thumbnail, so it must be a lowercase
@@ -38,6 +41,7 @@ registerHooks({
 const { parseSystemFile, serializeSystemFile, ImportError } = await import(
   '../src/lib/storage/persistence.ts'
 );
+const { decodeShareHash, hasSharePayload } = await import('../src/lib/storage/shareUrl.ts');
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const GALLERY_DIR = join(REPO_ROOT, 'public', 'gallery');
@@ -65,7 +69,7 @@ function parseArgs(argv) {
       fail(`unexpected argument ${arg}`);
     }
   }
-  if (!args.file) fail('usage: npm run gallery-add -- <file.json> --id <id> [--by "Name"] [--from "Place"] --blurb "..."');
+  if (!args.file) fail('usage: npm run gallery-add -- <share-url | file.json> --id <id> [--by "Name"] [--from "Place"] --blurb "..."');
   if (!args.id) fail('--id is required (it names public/gallery/<id>.json and <id>.jpg)');
   if (!/^[a-z0-9][a-z0-9-]*$/.test(args.id)) fail(`id "${args.id}" must be a lowercase slug (a-z, 0-9, hyphens)`);
   if (!args.blurb) fail('--blurb is required — say what is physically interesting about this system');
@@ -76,18 +80,38 @@ const args = parseArgs(process.argv.slice(2));
 
 // --- validate the submission ---------------------------------------------
 
-let text;
-try {
-  text = readFileSync(args.file, 'utf8');
-} catch {
-  fail(`could not read ${args.file}`);
+// A share link is recognised by its fragment, so a bare `#s=…` pasted without
+// the origin works as well as the full URL.
+function shareHashOf(source) {
+  let hash = source.startsWith('#') ? source : null;
+  if (hash === null) {
+    try {
+      hash = new URL(source).hash;
+    } catch {
+      return null;
+    }
+  }
+  return hasSharePayload(hash) ? hash : null;
 }
 
 let file;
+const shareHash = shareHashOf(args.file);
 try {
-  file = parseSystemFile(text);
+  if (shareHash !== null) {
+    file = await decodeShareHash(shareHash);
+  } else {
+    let text;
+    try {
+      text = readFileSync(args.file, 'utf8');
+    } catch {
+      fail(`could not read ${args.file} (not a share link, and not a readable file)`);
+    }
+    file = parseSystemFile(text);
+  }
 } catch (err) {
-  if (err instanceof ImportError) fail(`"${args.file}" failed validation: ${err.message}`);
+  if (err instanceof ImportError) {
+    fail(`${shareHash !== null ? 'the share link' : `"${args.file}"`} failed validation: ${err.message}`);
+  }
   throw err;
 }
 

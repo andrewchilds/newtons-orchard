@@ -125,8 +125,7 @@
 		{#if tab === "export"}
 			<div class="body" role="tabpanel" id="json-panel-export" aria-labelledby="json-tab-export">
 				<p class="hint">
-					“{file.name}” as a portable file — copy it to share your system, or to submit it to the
-					gallery.
+					“{file.name}” as a portable file — copy it to keep a backup or hand-edit your system.
 					{#if flattenedAt > 0}
 						This copy starts at your last edit ({formatSimDate(flattenedAt)}); the timeline before
 						it isn't included.

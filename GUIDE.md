@@ -593,8 +593,9 @@ carries a `shot`, portraits land in `public/missions/<id>.jpg` via
 Curated static data, split so the cold load stays small: eager metadata in
 `presets/gallery.ts`; each system's JSON at `public/gallery/<id>.json`, fetched
 only when picked and parsed through `parseSystemFile` like any untrusted
-import — failures degrade to an error toast. Submissions arrive via a Google
-Form (`GALLERY_FORM_URL`), reviewed by hand, added with `npm run gallery-add`
-(validates, writes both halves, leaves a placeholder `shot` to tune).
+import — failures degrade to an error toast. Submissions arrive by email as a
+share link (`GALLERY_SUBMISSION_MAILTO` prefills the template), reviewed by
+hand, added with `npm run gallery-add` (takes the share link or a JSON file;
+validates, writes both halves, leaves a placeholder `shot` to tune).
 Thumbnails via `npm run preset-screenshots -- --gallery`. `gallery.test.ts`
 fails on entries missing JSON or thumbnail, and on orphaned files.
