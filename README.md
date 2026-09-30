@@ -1,5 +1,7 @@
 # Newton’s Orchard
 
+https://github.com/user-attachments/assets/3e3c0c57-2e76-4e31-864f-2601d8995f95
+
 A serverless web app for building and viewing realistic solar systems in 3D:
 N-body gravity simulation, time scrubbing, and full control over planet creation
 (name, color, type, mass, radius, spin, axial tilt, orbit).
